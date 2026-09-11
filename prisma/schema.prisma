@@ -1,0 +1,49 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Car {
+  id                 String    @id @default(cuid())
+  make               String
+  model              String
+  year               Int
+  price              Float
+  mileageKm          Int
+  fuelType           String
+  transmission       String
+  ownership          String
+  bodyType           String
+  color              String
+  registrationCity   String
+  insuranceValidTill String
+  description        String
+  features           String    // JSON string array
+  images             String    // JSON string array
+  status             String    @default("AVAILABLE") // AVAILABLE, RESERVED, SOLD
+  isFeatured         Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  inquiries          Inquiry[]
+}
+
+model Inquiry {
+  id            String   @id @default(cuid())
+  carId         String?
+  car           Car?     @relation(fields: [carId], references: [id], onDelete: SetNull)
+  carTitle      String?
+  customerName  String
+  phone         String
+  email         String?
+  inquiryType   String   @default("GENERAL") // TEST_DRIVE, RESERVE_BOOKING, GENERAL
+  preferredDate String?
+  preferredTime String?
+  tokenAmount   Float?
+  message       String?
+  status        String   @default("NEW") // NEW, CONTACTED, COMPLETED
+  createdAt     DateTime @default(now())
+}
