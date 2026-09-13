@@ -29,9 +29,10 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const car = await prisma.car.findUnique({
-    where: { id: params.id },
+    where: { id },
   });
 
   if (!car) {
@@ -47,10 +48,11 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
 export default async function CarDetailsPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const car = await prisma.car.findUnique({
-    where: { id: params.id },
+    where: { id },
   });
 
   if (!car) {

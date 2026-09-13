@@ -5,11 +5,12 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const car = await prisma.car.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         inquiries: {
           orderBy: { createdAt: 'desc' },
@@ -31,9 +32,10 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const {
       make,
@@ -80,7 +82,7 @@ export async function PUT(
     }
 
     const updatedCar = await prisma.car.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
     });
 
@@ -93,11 +95,12 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await prisma.car.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ success: true, message: 'Car deleted successfully' });
