@@ -12,64 +12,9 @@ import {
   Phone,
   AlertCircle, 
   CheckCircle2, 
-  Sparkles,
   KeyRound,
-  Building2,
-  ChevronDown,
-  ChevronUp
+  Sparkles
 } from 'lucide-react';
-
-const DEMO_ACCOUNTS = [
-  {
-    role: 'ADMIN',
-    name: 'Super Admin (All Dealerships)',
-    phone: '9876543210',
-    password: 'Admin@1234',
-    badge: 'Full Access',
-  },
-  {
-    role: 'DEALER',
-    name: 'Brothers Central Hub (Andheri)',
-    phone: '9820011223',
-    password: 'Dealer@123',
-    badge: 'Dealer 1',
-  },
-  {
-    role: 'DEALER',
-    name: 'Apex Motors (Bandra West)',
-    phone: '9820022334',
-    password: 'Dealer@123',
-    badge: 'Dealer 2',
-  },
-  {
-    role: 'DEALER',
-    name: 'Prestige Wheels (South Mumbai)',
-    phone: '9820033445',
-    password: 'Dealer@123',
-    badge: 'Dealer 3',
-  },
-  {
-    role: 'DEALER',
-    name: 'Royal Auto Plaza (Thane)',
-    phone: '9820044556',
-    password: 'Dealer@123',
-    badge: 'Dealer 4',
-  },
-  {
-    role: 'DEALER',
-    name: 'Urban Drive Dealership (Navi Mumbai)',
-    phone: '9820055667',
-    password: 'Dealer@123',
-    badge: 'Dealer 5',
-  },
-  {
-    role: 'DEALER',
-    name: 'Elite Pre-Owned Hub (Worli)',
-    phone: '9820066778',
-    password: 'Dealer@123',
-    badge: 'Dealer 6',
-  },
-];
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -82,18 +27,16 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [showDemoAccounts, setShowDemoAccounts] = useState(false);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Only allow digits, max 10 chars
     const val = e.target.value.replace(/\D/g, '').slice(0, 10);
     setPhone(val);
     if (error) setError(null);
   };
 
-  const handleSelectDemo = (account: typeof DEMO_ACCOUNTS[0]) => {
-    setPhone(account.phone);
-    setPassword(account.password);
+  const handleFillSuperAdmin = () => {
+    setPhone('9916581617');
+    setPassword('Gagan@2006');
     setError(null);
   };
 
@@ -106,7 +49,7 @@ function LoginForm() {
     }
 
     if (phone.length !== 10) {
-      setError('Mobile number must be exactly 10 digits (e.g. 9820011223).');
+      setError('Mobile number must be exactly 10 digits (e.g. 9916581617).');
       return;
     }
 
@@ -133,11 +76,10 @@ function LoginForm() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed. Please check your mobile number and password.');
+        throw new Error(data.error || 'Authentication failed. Please check your credentials.');
       }
 
       setSuccess(true);
-      // Full browser navigation to ensure new session cookie is utilized
       window.location.href = destination;
     } catch (err: any) {
       setError(err.message || 'Incorrect mobile number or password.');
@@ -161,14 +103,14 @@ function LoginForm() {
           
           <div className="flex items-center justify-center gap-2 mb-1">
             <span className="text-xs font-bold uppercase tracking-widest text-amber-400">
-              Multi-Dealer Portal
+              Dealer Portal
             </span>
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight">
-            Brothers Autos Admin
+            Brothers Autos Portal
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Authorized personnel only &bull; Individual dealer credentials
+            Authorized personnel only &bull; Mobile & Password Authentication
           </p>
         </div>
 
@@ -211,7 +153,7 @@ function LoginForm() {
                 maxLength={10}
                 value={phone}
                 onChange={handlePhoneChange}
-                placeholder="10-digit number (e.g. 9820011223)"
+                placeholder="10-digit number (e.g. 9916581617)"
                 disabled={loading || success}
                 autoFocus
                 className="w-full pl-16 pr-4 py-3 bg-slate-800/80 border border-slate-700/80 rounded-xl text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all disabled:opacity-50"
@@ -284,48 +226,16 @@ function LoginForm() {
           </button>
         </form>
 
-        {/* 1-Click Demo Accounts Selector */}
-        <div className="mt-6 pt-4 border-t border-slate-800/80">
+        {/* Quick-fill Super Admin button */}
+        <div className="mt-6 pt-4 border-t border-slate-800/80 text-center">
           <button
             type="button"
-            onClick={() => setShowDemoAccounts(!showDemoAccounts)}
-            className="w-full flex items-center justify-between text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors py-1 cursor-pointer"
+            onClick={handleFillSuperAdmin}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
           >
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Quick Test: Select Demo Account ({DEMO_ACCOUNTS.length})</span>
-            </span>
-            {showDemoAccounts ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Fill Super Admin Credentials (Gagan Gowda M)</span>
           </button>
-
-          {showDemoAccounts && (
-            <div className="mt-3 space-y-1.5 max-h-56 overflow-y-auto pr-1">
-              {DEMO_ACCOUNTS.map((acc, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleSelectDemo(acc)}
-                  className="w-full text-left p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 transition-all flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="truncate pr-2">
-                    <div className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors truncate">
-                      {acc.name}
-                    </div>
-                    <div className="text-[11px] font-mono text-slate-400">
-                      {acc.phone} &bull; <span className="text-slate-500">{acc.password}</span>
-                    </div>
-                  </div>
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 ${
-                    acc.role === 'ADMIN'
-                      ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
-                      : 'bg-blue-400/20 text-blue-300 border border-blue-400/40'
-                  }`}>
-                    {acc.badge}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 

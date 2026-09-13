@@ -37,7 +37,8 @@ import {
   UserX,
   Shield,
   Check,
-  Tag
+  Tag,
+  KeyRound
 } from 'lucide-react';
 
 interface CurrentUser {
@@ -92,6 +93,12 @@ export default function AdminPage() {
     role: 'DEALER',
   });
   const [savingDealer, setSavingDealer] = useState(false);
+
+  // Modal State for Reset Dealer Password (Admin only)
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
+  const [resetTargetDealer, setResetTargetDealer] = useState<any | null>(null);
+  const [newDealerPassword, setNewDealerPassword] = useState('');
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   // Image Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -447,17 +454,17 @@ export default function AdminPage() {
 
   // Re-seed Database (Admin only)
   const handleReseed = async () => {
-    if (!window.confirm('Reset and re-seed the database with 1 Admin, 6 Dealers, showcase inventory, and test leads?')) {
+    if (!window.confirm('Reset database to clean production baseline (Super Admin Gagan Gowda M, 0 cars, 0 leads)?')) {
       return;
     }
     try {
       setLoading(true);
       const res = await fetch('/api/seed', { method: 'POST' });
       const data = await res.json();
-      alert(data.message || 'Database re-seeded successfully!');
+      alert(data.message || 'Database reset to clean production baseline successfully!');
       loadData();
     } catch (err) {
-      alert('Failed to re-seed database');
+      alert('Failed to reset database');
     } finally {
       setLoading(false);
     }
@@ -553,6 +560,49 @@ export default function AdminPage() {
     }
   };
 
+  // Open Reset Password Modal (Admin only)
+  const handleOpenResetPassword = (dealer: any) => {
+    setResetTargetDealer(dealer);
+    setNewDealerPassword('');
+    setIsResetPasswordOpen(true);
+  };
+
+  // Submit Reset Password (Admin only)
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetTargetDealer) return;
+
+    if (!newDealerPassword.trim() || newDealerPassword.trim().length < 6) {
+      alert('New password must be at least 6 characters long.');
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      const res = await fetch(`/api/admin/dealers/${resetTargetDealer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newDealerPassword.trim() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update dealer password');
+
+      setActionMessage({
+        type: 'success',
+        text: `Password updated successfully for ${resetTargetDealer.name}!`,
+      });
+      setIsResetPasswordOpen(false);
+      setResetTargetDealer(null);
+      setNewDealerPassword('');
+      setTimeout(() => setActionMessage(null), 3500);
+    } catch (err: any) {
+      alert(err.message || 'Error updating password');
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
   // Filtered Cars in Admin Table
   const displayCars = cars.filter((car) => {
     if (statusFilter !== 'ALL' && car.status !== statusFilter) return false;
@@ -614,10 +664,10 @@ export default function AdminPage() {
             <button
               onClick={handleReseed}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
-              title="Reset DB with default 6 dealers & showcase vehicles"
+              title="Reset database to clean production baseline (Super Admin Gagan Gowda M)"
             >
               <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-              <span>Reset Demo DB</span>
+              <span>Reset Production DB</span>
             </button>
           )}
 
@@ -939,8 +989,27 @@ export default function AdminPage() {
             </div>
 
             {displayCars.length === 0 && (
-              <div className="p-8 text-center text-slate-500 text-xs">
-                No vehicles found matching current search.
+              <div className="p-12 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                  <Car className="w-6 h-6" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-800">
+                  {cars.length === 0 ? 'No vehicles currently in showroom inventory' : 'No matching vehicles found'}
+                </h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
+                  {cars.length === 0
+                    ? 'Start building your showroom fleet by adding your first certified pre-owned vehicle.'
+                    : 'Try clearing your search query or adjusting your status filters.'}
+                </p>
+                {cars.length === 0 && (
+                  <button
+                    onClick={handleOpenAdd}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 transition-colors shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add First Vehicle</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1074,8 +1143,14 @@ export default function AdminPage() {
             </div>
 
             {inquiries.length === 0 && (
-              <div className="p-8 text-center text-slate-500 text-xs">
-                No customer inquiries yet for this dealership.
+              <div className="p-12 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                  <MessageCircle className="w-6 h-6" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-800">No customer inquiries yet</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                  Customer inquiries submitted via the website contact forms and car inquiry buttons will appear here in real time.
+                </p>
               </div>
             )}
           </div>
@@ -1175,20 +1250,30 @@ export default function AdminPage() {
                           )}
                         </td>
 
-                        {/* Toggle Active Button */}
+                        {/* Access Controls: Reset Password & Toggle Active */}
                         <td className="py-3.5 px-4 text-right">
-                          {!isSelf && (
+                          <div className="flex items-center justify-end gap-2">
                             <button
-                              onClick={() => handleToggleDealerActive(dealer)}
-                              className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
-                                dealer.isActive
-                                  ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-                                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                              }`}
+                              onClick={() => handleOpenResetPassword(dealer)}
+                              className="px-2.5 py-1.5 rounded-lg font-bold text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors inline-flex items-center gap-1 border border-slate-200 cursor-pointer"
+                              title="Reset Password"
                             >
-                              {dealer.isActive ? 'Deactivate Access' : 'Reactivate Access'}
+                              <KeyRound className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Reset Password</span>
                             </button>
-                          )}
+                            {!isSelf && (
+                              <button
+                                onClick={() => handleToggleDealerActive(dealer)}
+                                className={`px-2.5 py-1.5 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
+                                  dealer.isActive
+                                    ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                                }`}
+                              >
+                                {dealer.isActive ? 'Deactivate' : 'Reactivate'}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1196,6 +1281,25 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
+
+            {dealers.length === 0 && (
+              <div className="p-12 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                  <Users className="w-6 h-6" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-800">No registered dealers yet</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
+                  Add dealer accounts to allow multiple sales partners to manage their own vehicles and leads.
+                </p>
+                <button
+                  onClick={() => setIsDealerModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-amber-500 hover:bg-amber-400 transition-colors shadow-sm cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add First Dealer</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1733,6 +1837,91 @@ export default function AdminPage() {
               </div>
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* RESET DEALER PASSWORD MODAL (Admin only) */}
+      {isResetPasswordOpen && resetTargetDealer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
+            <div className="bg-slate-900 text-white p-6 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                  Security & Access
+                </span>
+                <h3 className="text-xl font-bold text-white mt-0.5">
+                  Reset Password
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setIsResetPasswordOpen(false);
+                  setResetTargetDealer(null);
+                }}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleResetPassword} className="p-6 space-y-4 text-xs">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <div className="text-slate-500 text-[11px] font-semibold">Account:</div>
+                <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-slate-400" />
+                  {resetTargetDealer.name}
+                </div>
+                <div className="text-xs text-slate-600 font-mono">
+                  Login ID: +91 {resetTargetDealer.phone}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  New Password *
+                </label>
+                <input
+                  type="text"
+                  required
+                  minLength={6}
+                  value={newDealerPassword}
+                  onChange={(e) => setNewDealerPassword(e.target.value)}
+                  placeholder="Enter new password (min 6 characters)"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 font-semibold"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  The dealer will immediately use this new password to sign into the portal.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResetPasswordOpen(false);
+                    setResetTargetDealer(null);
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resettingPassword}
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-md disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                >
+                  {resettingPassword ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <span>Update Password</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

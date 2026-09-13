@@ -45,7 +45,7 @@ export default function Navbar() {
             </span>
           </div>
           <div className="flex items-center space-x-5">
-            <span className="text-slate-300">Mon-Sun: 9:30 AM – 8:30 PM</span>
+            <span className="text-slate-300">Mon-Sat: 9:30 AM – 8:00 PM | Sun: 10:00 AM – 6:00 PM</span>
             <a 
               href={`tel:${SHOWROOM_INFO.phoneRaw}`} 
               className="font-semibold text-white hover:text-brand-400 transition-colors flex items-center gap-1"

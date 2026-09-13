@@ -1,67 +1,32 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { SEED_CARS, SEED_INQUIRIES, SEED_DEALERS } from '../lib/seedData';
 
 const prisma = new PrismaClient();
 
 export async function runSeed() {
-  console.log('Seeding multi-tenant Brothers Autos database...');
+  console.log('Purging mock data and seeding production Super Admin...');
 
-  // 1. Clear existing records in correct relation order
+  // 1. Wipe out all inquiries, mock cars, and dummy dealers
   await prisma.inquiry.deleteMany();
   await prisma.car.deleteMany();
   await prisma.dealer.deleteMany();
 
-  // 2. Insert Dealers and Admin
-  const createdDealers = [];
-  for (const dealerData of SEED_DEALERS) {
-    const hashedPassword = await bcrypt.hash(dealerData.passwordRaw, 10);
-    const dealer = await prisma.dealer.create({
-      data: {
-        name: dealerData.name,
-        phone: dealerData.phone,
-        password: hashedPassword,
-        role: dealerData.role,
-        isActive: dealerData.isActive,
-      },
-    });
-    createdDealers.push(dealer);
-  }
-  console.log(`Seeded ${createdDealers.length} dealers/admins.`);
+  // 2. Hash Super Admin password
+  const hashedPassword = await bcrypt.hash('Gagan@2006', 10);
 
-  // Dealer accounts list (filter dealers excluding pure admin for car distribution, or include admin)
-  const regularDealers = createdDealers.filter((d) => d.role === 'DEALER');
+  // 3. Seed ONLY the Super Admin account
+  const superAdmin = await prisma.dealer.create({
+    data: {
+      name: 'Gagan Gowda M',
+      phone: '9916581617',
+      password: hashedPassword,
+      role: 'ADMIN',
+      isActive: true,
+    },
+  });
 
-  // 3. Insert Cars distributed across dealers
-  const createdCars = [];
-  for (let i = 0; i < SEED_CARS.length; i++) {
-    const carData = SEED_CARS[i];
-    // Distribute cars among the 6 dealers
-    const assignedDealer = regularDealers[i % regularDealers.length];
-    const car = await prisma.car.create({
-      data: {
-        ...carData,
-        dealerId: assignedDealer.id,
-      },
-    });
-    createdCars.push(car);
-  }
-  console.log(`Seeded ${createdCars.length} cars distributed among ${regularDealers.length} dealers.`);
-
-  // 4. Insert Inquiries linked to cars and respective dealers
-  for (let i = 0; i < SEED_INQUIRIES.length; i++) {
-    const inquiry = SEED_INQUIRIES[i];
-    const linkedCar = createdCars[i % createdCars.length];
-    await prisma.inquiry.create({
-      data: {
-        ...inquiry,
-        carId: linkedCar.id,
-        dealerId: linkedCar.dealerId,
-        carTitle: `${linkedCar.year} ${linkedCar.make} ${linkedCar.model}`,
-      },
-    });
-  }
-  console.log(`Seeded ${SEED_INQUIRIES.length} sample customer inquiries with dealer attribution.`);
+  console.log(`Successfully seeded Super Admin: ${superAdmin.name} (${superAdmin.phone}) [Role: ${superAdmin.role}]`);
+  console.log('All mock cars, dummy inquiries, and test dealers have been purged.');
 }
 
 runSeed()

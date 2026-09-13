@@ -140,7 +140,7 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Interactive Embedded Google Map Placeholder (7 columns) */}
+          {/* Interactive Embedded Google Map (7 columns) */}
           <div className="lg:col-span-7 flex flex-col">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-bold text-white text-sm uppercase tracking-wider flex items-center gap-2">
@@ -148,67 +148,44 @@ export default function Footer() {
                 Showroom Location & Directions
               </h4>
               <a
-                href="https://maps.google.com"
+                href={SHOWROOM_INFO.mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 font-medium"
+                className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 font-semibold"
               >
                 <span>Open in Google Maps</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
             </div>
 
-            {/* Styled Map Container */}
-            <div className="relative w-full h-72 sm:h-80 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-900 group">
-              {/* Map background styling simulation with street grid */}
-              <div className="absolute inset-0 bg-slate-900">
-                {/* SVG styled road map grid simulation */}
-                <svg className="w-full h-full opacity-35" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <pattern id="road-grid" width="80" height="80" patternUnits="userSpaceOnUse">
-                      <path d="M 80 0 L 0 0 0 80" fill="none" stroke="#334155" strokeWidth="2" />
-                      <path d="M 0 40 L 80 40" fill="none" stroke="#1e293b" strokeWidth="6" />
-                      <path d="M 40 0 L 40 80" fill="none" stroke="#1e293b" strokeWidth="6" />
-                    </pattern>
-                  </defs>
-                  <rect width="100%" height="100%" fill="url(#road-grid)" />
-                  <line x1="0" y1="120" x2="100%" y2="160" stroke="#2563eb" strokeWidth="4" strokeOpacity="0.6" />
-                  <line x1="180" y1="0" x2="320" y2="100%" stroke="#475569" strokeWidth="8" />
-                </svg>
-
-                {/* Subtle gradient vignette */}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/40" />
-              </div>
-
-              {/* Showroom Marker Pin */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center z-10 pointer-events-none">
-                <div className="relative mb-2">
-                  <div className="absolute -inset-2 bg-brand-500/30 rounded-full animate-ping" />
-                  <div className="relative p-3.5 bg-gradient-to-tr from-brand-600 to-brand-500 rounded-full text-white shadow-xl ring-4 ring-white/20">
-                    <MapPin className="w-7 h-7" />
-                  </div>
-                </div>
-                <div className="bg-slate-900/95 backdrop-blur-md px-4 py-2.5 rounded-xl border border-slate-700 shadow-xl max-w-xs">
-                  <p className="text-xs font-bold text-white uppercase tracking-wider">Brothers Autos Showroom</p>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Auto Zone, Opp Metro Pillar 184</p>
-                  <p className="text-[10px] text-emerald-400 font-medium mt-1">Open Now &bull; Free Customer Parking Available</p>
-                </div>
-              </div>
+            {/* Embedded Google Maps Container */}
+            <div className="relative w-full h-80 sm:h-96 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-900 flex flex-col">
+              <iframe
+                src={SHOWROOM_INFO.mapsEmbedSrc}
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                title="Brothers Autos Showroom Location"
+                className="w-full h-full"
+              />
 
               {/* Bottom Quick Map Bar */}
-              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-xl border border-slate-800 z-10">
-                <span className="text-xs text-slate-300 font-medium flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  25+ Premium Cars On Display Today
+              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between bg-slate-900/90 backdrop-blur-md px-4 py-2.5 rounded-xl border border-slate-800 shadow-lg">
+                <span className="text-xs text-slate-300 font-medium flex items-center gap-1.5 truncate pr-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
+                  <span className="truncate">Machohalli Showroom &bull; Magadi Main Rd</span>
                 </span>
                 <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('Brothers Autos Mumbai')}`}
+                  href={SHOWROOM_INFO.mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs bg-brand-600 hover:bg-brand-500 text-white font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors pointer-events-auto"
+                  className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors shrink-0 shadow-sm"
                 >
                   <Navigation className="w-3 h-3" />
-                  Get Directions
+                  <span>Get Directions</span>
                 </a>
               </div>
             </div>
@@ -217,7 +194,7 @@ export default function Footer() {
 
         {/* Bottom copyright & quick links bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>&copy; {new Date().getFullYear()} Brothers Autos. All Rights Reserved. Certified Pre-Owned Vehicle Dealership.</p>
+          <p>&copy; {new Date().getFullYear()} Brothers Autos. All Rights Reserved. Certified Pre-Owned Dealership.</p>
           <div className="flex items-center space-x-6">
             <Link href="/inventory" className="hover:text-slate-300 transition-colors">
               Browse Cars
@@ -226,10 +203,10 @@ export default function Footer() {
               EMI Calculator
             </Link>
             <Link href="/admin" className="hover:text-amber-400 transition-colors">
-              Dealer Login
+              Dealer Portal
             </Link>
             <a 
-              href={`https://wa.me/${SHOWROOM_INFO.whatsappNumber}`} 
+              href={`https://wa.me/${SHOWROOM_INFO.whatsappNumber}?text=${encodeURIComponent('Hi Brothers Autos, I would like to inquire about Used Cars')}`}
               target="_blank" 
               rel="noopener noreferrer"
               className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import CarCard from '@/components/CarCard';
 import FilterBar from '@/components/FilterBar';
-import { Car, Sparkles, Loader2 } from 'lucide-react';
+import { Car, Sparkles, Loader2, MessageCircle } from 'lucide-react';
 
 function InventoryContent() {
   const searchParams = useSearchParams();
@@ -165,6 +165,30 @@ function InventoryContent() {
           <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
           <p className="text-sm font-semibold text-slate-500">Loading showroom inventory...</p>
         </div>
+      ) : cars.length === 0 ? (
+        /* Empty Database State */
+        <div className="py-20 px-6 text-center bg-white rounded-3xl border border-dashed border-slate-300 max-w-lg mx-auto space-y-5 shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 shadow-xs">
+            <Car className="w-8 h-8" />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-xl font-bold text-slate-900">
+              New Premium Pre-Owned Inventory Arriving Soon
+            </h3>
+            <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+              New premium pre-owned inventory arriving soon. Contact us directly on WhatsApp for incoming stock.
+            </p>
+          </div>
+          <a
+            href="https://wa.me/919916581617?text=Hi%20Brothers%20Autos,%20I%20would%20like%20to%20inquire%20about%20Used%20Cars"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-lg active:scale-95 cursor-pointer"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>Contact Us on WhatsApp (+91 9916581617)</span>
+          </a>
+        </div>
       ) : filteredCars.length === 0 ? (
         /* Empty State */
         <div className="py-16 px-6 text-center bg-white rounded-3xl border border-dashed border-slate-300 max-w-md mx-auto space-y-4 shadow-xs">
@@ -179,7 +203,7 @@ function InventoryContent() {
           </div>
           <button
             onClick={handleResetFilters}
-            className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow"
+            className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow cursor-pointer"
           >
             Reset All Filters
           </button>

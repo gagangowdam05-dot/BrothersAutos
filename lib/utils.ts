@@ -54,20 +54,20 @@ export function calculateEMI(principal: number, annualRate: number = 9.5, tenure
 }
 
 export function getWhatsAppCarInquiryUrl(car: {
-  id: string;
+  id?: string;
   make: string;
   model: string;
-  year: number;
-  price: number;
+  year?: number;
+  price?: number;
 }): string {
-  const formattedPrice = formatPrice(car.price);
-  const message = `Hi Brothers Autos, I am interested in the ${car.year} ${car.make} ${car.model} (Price: ${formattedPrice}, Ref: ${car.id.slice(-6).toUpperCase()}). Is it available for inspection and test drive?`;
-  return `https://wa.me/${SHOWROOM_INFO.whatsappNumber}?text=${encodeURIComponent(message)}`;
+  const carTitle = `${car.year ? `${car.year} ` : ''}${car.make} ${car.model}`.trim();
+  const text = `Hi Brothers Autos, I would like to inquire about ${carTitle}`;
+  return `https://wa.me/${SHOWROOM_INFO.whatsappNumber}?text=${encodeURIComponent(text)}`;
 }
 
 export function getGeneralWhatsAppUrl(): string {
-  const message = `Hi Brothers Autos, I am looking for a certified pre-owned car. Could you please share the latest available inventory?`;
-  return `https://wa.me/${SHOWROOM_INFO.whatsappNumber}?text=${encodeURIComponent(message)}`;
+  const text = `Hi Brothers Autos, I would like to inquire about Used Cars`;
+  return `https://wa.me/${SHOWROOM_INFO.whatsappNumber}?text=${encodeURIComponent(text)}`;
 }
 
 export function parseJsonArray<T = string>(raw: string | undefined | null, fallback: T[] = []): T[] {

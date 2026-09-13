@@ -18,7 +18,10 @@ import {
   Star, 
   PhoneCall,
   ChevronRight,
-  Search
+  Search,
+  MessageCircle,
+  FileCheck,
+  Zap
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -58,30 +61,6 @@ export default async function HomePage() {
     Landmark: <Landmark className="w-6 h-6 text-indigo-500" />,
     RefreshCw: <RefreshCw className="w-6 h-6 text-rose-500" />,
   };
-
-  const testimonials = [
-    {
-      name: "Rohit Agarwal",
-      car: "Bought 2022 Hyundai Creta SX(O)",
-      city: "Mumbai",
-      rating: 5,
-      review: "Brothers Autos gave me absolute transparency. The 200-point inspection report was totally accurate, and their team got my car loan approved from HDFC within 2 hours. Car delivered like brand new!",
-    },
-    {
-      name: "Col. Sanjeev Rawat",
-      car: "Bought 2021 BMW 330i M Sport",
-      city: "Pune",
-      rating: 5,
-      review: "Purchasing a pre-owned luxury car usually comes with doubts, but Brothers Autos showed digital OBD scan records and zero meter tampering proof. Unbelievable professionalism.",
-    },
-    {
-      name: "Pooja Hegde",
-      car: "Bought 2023 Tata Nexon EV Max",
-      city: "Thane",
-      rating: 5,
-      review: "Smooth test drive right to my society gate. RC transfer was handled completely by Brothers Autos with zero extra follow-up needed. Truly 5-star experience!",
-    }
-  ];
 
   return (
     <div className="flex flex-col space-y-16 sm:space-y-24">
@@ -275,11 +254,36 @@ export default async function HomePage() {
         </div>
 
         {/* Dynamic Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredCars.map((car) => (
-            <CarCard key={car.id} car={car} />
-          ))}
-        </div>
+        {featuredCars.length === 0 ? (
+          <div className="py-16 px-6 text-center bg-white rounded-3xl border border-dashed border-slate-300 max-w-lg mx-auto space-y-4 shadow-xs">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
+              <Car className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-slate-900">
+                New Premium Pre-Owned Inventory Arriving Soon
+              </h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                New premium pre-owned inventory arriving soon. Contact us directly on WhatsApp for incoming stock.
+              </p>
+            </div>
+            <a
+              href="https://wa.me/919916581617?text=Hi%20Brothers%20Autos,%20I%20would%20like%20to%20inquire%20about%20Used%20Cars"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md active:scale-95"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Inquire on WhatsApp (+91 9916581617)</span>
+            </a>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {featuredCars.map((car) => (
+              <CarCard key={car.id} car={car} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 3. WHY CHOOSE BROTHERS AUTOS (TRUST PILLARS) */}
@@ -323,47 +327,68 @@ export default async function HomePage() {
         <EmiCalculator />
       </section>
 
-      {/* 5. VERIFIED BUYER TESTIMONIALS */}
+      {/* 5. VERIFIED 4-STEP BUYING EXPERIENCE */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
-            Real Experiences
+          <span className="text-xs font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+            Transparent Experience
           </span>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">
-            Loved By Over 2,500+ Car Owners
+            How to Buy Your Car at Brothers Autos
           </h2>
           <p className="text-sm text-slate-500">
-            Read verified reviews from customers who purchased certified cars from Brothers Autos
+            A seamless, transparent 4-step journey from initial inquiry to doorstep delivery
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {testimonials.map((t, idx) => (
-            <div
-              key={idx}
-              className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between space-y-4"
-            >
-              <div className="space-y-3">
-                {/* 5 Stars */}
-                <div className="flex items-center gap-1 text-amber-400">
-                  {[...Array(t.rating)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-current" />
-                  ))}
-                </div>
-                <p className="text-xs text-slate-700 leading-relaxed italic">
-                  "{t.review}"
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">{t.name}</h4>
-                  <p className="text-[11px] text-brand-600 font-medium">{t.car}</p>
-                </div>
-                <span className="text-[11px] text-slate-400">{t.city}</span>
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+            <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-black text-sm">
+              01
             </div>
-          ))}
+            <div>
+              <h4 className="text-base font-bold text-slate-900">Explore & Inquire</h4>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Connect directly on WhatsApp or call our Machohalli showroom for real-time inventory updates.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black text-sm">
+              02
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-900">200-Pt Inspection</h4>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Review full mechanical, electrical, and structural inspection reports before taking a test drive.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-sm">
+              03
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-900">Instant Financing</h4>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Quick approvals with HDFC, SBI, and ICICI at competitive rates with minimal documentation.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm">
+              04
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-900">Delivery & Transfer</h4>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Enjoy hassle-free same-day delivery with complete RTO RC ownership transfer handled by us.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
