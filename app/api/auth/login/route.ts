@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { comparePassword } from '@/lib/password';
 import { 
   createSessionToken, 
-  create2FAChallengeToken,
   ADMIN_COOKIE_NAME, 
   SECURE_COOKIE_OPTIONS,
 } from '@/lib/auth';
@@ -99,39 +98,7 @@ export async function POST(request: Request) {
     // 6. Successful Primary Verification - Reset Rate Limit
     resetAuthRateLimit(request, cleanPhone);
 
-    // 7. Step-Up Multi-Factor Authentication (2FA) for Privileged Roles
-    if (dealer.role === 'ADMIN') {
-      // Generate a secure 6-digit numeric OTP
-      const cryptoArray = new Uint32Array(1);
-      crypto.getRandomValues(cryptoArray);
-      const plainOtp = String(100000 + (cryptoArray[0] % 900000));
-
-      // Issue signed intermediate 2FA challenge token (5-minute TTL)
-      const tempToken = await create2FAChallengeToken(
-        {
-          dealerId: dealer.id,
-          name: dealer.name,
-          phone: dealer.phone,
-          role: 'ADMIN',
-        },
-        plainOtp
-      );
-
-      // In production, integrate SMS / WhatsApp gateway dispatch here.
-      // For local development and testing, log OTP to server console.
-      console.log(`[2FA SECURITY CHALLENGE] One-Time Password for ${dealer.phone}: ${plainOtp}`);
-
-      const maskedPhone = `+91 ******${dealer.phone.slice(-4)}`;
-
-      return NextResponse.json({
-        requires2FA: true,
-        tempToken,
-        maskedPhone,
-        message: `Security code dispatched to ${maskedPhone}. Please enter the 6-digit code to complete verification.`,
-      }, { headers: rateLimitHeaders });
-    }
-
-    // 8. Standard Dealer Authentication (Issue Secure Session Cookie)
+    // 7. Direct Authentication (Issue Secure Session Cookie)
     const token = await createSessionToken({
       dealerId: dealer.id,
       name: dealer.name,
