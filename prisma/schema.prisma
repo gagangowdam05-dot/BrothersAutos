@@ -1,14 +1,29 @@
 datasource db {
   provider = "postgresql"
-  url      =  env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
+model Dealer {
+  id        String    @id @default(cuid())
+  name      String
+  phone     String    @unique
+  password  String
+  role      String    @default("DEALER") // ADMIN | DEALER
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  cars      Car[]
+  leads     Inquiry[]
+}
+
 model Car {
   id                 String    @id @default(cuid())
+  dealerId           String?
+  dealer             Dealer?   @relation(fields: [dealerId], references: [id], onDelete: SetNull)
   make               String
   model              String
   year               Int
@@ -33,6 +48,8 @@ model Car {
 
 model Inquiry {
   id            String   @id @default(cuid())
+  dealerId      String?
+  dealer        Dealer?  @relation(fields: [dealerId], references: [id], onDelete: SetNull)
   carId         String?
   car           Car?     @relation(fields: [carId], references: [id], onDelete: SetNull)
   carTitle      String?

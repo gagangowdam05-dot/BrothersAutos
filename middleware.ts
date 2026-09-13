@@ -5,15 +5,15 @@ import { ADMIN_COOKIE_NAME, verifySessionToken } from '@/lib/auth';
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-  const isAuthenticated = await verifySessionToken(token);
+  const session = await verifySessionToken(token);
+  const isAuthenticated = Boolean(session);
 
   // 1. Handling the Login Page
   if (pathname === '/admin/login') {
-    // If admin is already authenticated, redirect them straight to the admin dashboard
+    // If dealer/admin is already authenticated, redirect them straight to dashboard
     if (isAuthenticated) {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
-    // Otherwise, allow access to the login page
     return NextResponse.next();
   }
 
@@ -30,13 +30,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 3. Protecting Mutating API Routes
+  // 3. Protecting Dealer Management API (Admin only)
+  if (pathname.startsWith('/api/admin/dealers')) {
+    if (!session || session.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Forbidden. Administrator privileges required to manage dealers.' },
+        { status: 403 }
+      );
+    }
+  }
+
+  // 4. Protecting Mutating API Routes
   // Protect Car modifications (POST /api/cars, PUT /api/cars/:id, DELETE /api/cars/:id)
   if (pathname.startsWith('/api/cars')) {
     const isMutation = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method);
     if (isMutation && !isAuthenticated) {
       return NextResponse.json(
-        { error: 'Unauthorized. Admin session required to modify vehicles.' },
+        { error: 'Unauthorized. Dealer session required to modify vehicles.' },
         { status: 401 }
       );
     }
@@ -57,7 +67,7 @@ export async function middleware(request: NextRequest) {
     const isMutation = ['PATCH', 'PUT', 'DELETE'].includes(request.method);
     if (isMutation && !isAuthenticated) {
       return NextResponse.json(
-        { error: 'Unauthorized. Admin session required to modify leads.' },
+        { error: 'Unauthorized. Dealer session required to modify leads.' },
         { status: 401 }
       );
     }
@@ -67,7 +77,7 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/api/upload')) {
     if (!isAuthenticated) {
       return NextResponse.json(
-        { error: 'Unauthorized. Admin session required to upload images.' },
+        { error: 'Unauthorized. Dealer session required to upload images.' },
         { status: 401 }
       );
     }
@@ -79,6 +89,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/admin/:path*',
+    '/api/admin/dealers/:path*',
     '/api/cars/:path*',
     '/api/seed/:path*',
     '/api/inquiries/:path*',

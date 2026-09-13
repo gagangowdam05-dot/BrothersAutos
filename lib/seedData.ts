@@ -297,3 +297,56 @@ export const SEED_INQUIRIES = [
     status: "NEW",
   }
 ];
+
+export const SEED_DEALERS = [
+  {
+    name: "Gagan Gowda (Super Admin)",
+    phone: "9876543210",
+    passwordRaw: "Admin@1234",
+    role: "ADMIN",
+    isActive: true,
+  },
+  {
+    name: "Brothers Central Hub (Andheri)",
+    phone: "9820011223",
+    passwordRaw: "Dealer@123",
+    role: "DEALER",
+    isActive: true,
+  },
+  {
+    name: "Apex Motors (Bandra West)",
+    phone: "9820022334",
+    passwordRaw: "Dealer@123",
+    role: "DEALER",
+    isActive: true,
+  },
+  {
+    name: "Prestige Wheels (South Mumbai)",
+    phone: "9820033445",
+    passwordRaw: "Dealer@123",
+    role: "DEALER",
+    isActive: true,
+  },
+  {
+    name: "Royal Auto Plaza (Thane)",
+    phone: "9820044556",
+    passwordRaw: "Dealer@123",
+    role: "DEALER",
+    isActive: true,
+  },
+  {
+    name: "Urban Drive Dealership (Navi Mumbai)",
+    phone: "9820055667",
+    passwordRaw: "Dealer@123",
+    role: "DEALER",
+    isActive: true,
+  },
+  {
+    name: "Elite Pre-Owned Hub (Worli)",
+    phone: "9820066778",
+    passwordRaw: "Dealer@123",
+    role: "DEALER",
+    isActive: true,
+  },
+];
+

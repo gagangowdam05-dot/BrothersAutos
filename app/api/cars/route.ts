@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+    const scope = searchParams.get('scope');
+    const dealerId = searchParams.get('dealerId');
     const featured = searchParams.get('featured');
     const status = searchParams.get('status');
     const make = searchParams.get('make');
@@ -18,6 +21,29 @@ export async function GET(request: Request) {
     const sortBy = searchParams.get('sortBy');
 
     const where: any = {};
+
+    // Multi-tenant scoping for dealer portal
+    if (scope === 'portal') {
+      const session = await getSession();
+      if (!session) {
+        return NextResponse.json(
+          { error: 'Unauthorized. Session required to access dealer inventory.' },
+          { status: 401 }
+        );
+      }
+
+      if (session.role === 'DEALER') {
+        // Strictly scoped to the authenticated dealer's inventory
+        where.dealerId = session.dealerId;
+      } else if (session.role === 'ADMIN') {
+        // Admin can view all or filter by specific dealerId
+        if (dealerId && dealerId !== 'ALL') {
+          where.dealerId = dealerId;
+        }
+      }
+    } else if (dealerId && dealerId !== 'ALL') {
+      where.dealerId = dealerId;
+    }
 
     if (featured === 'true') {
       where.isFeatured = true;
@@ -51,9 +77,9 @@ export async function GET(request: Request) {
 
     if (search) {
       where.OR = [
-        { make: { contains: search } },
-        { model: { contains: search } },
-        { description: { contains: search } },
+        { make: { contains: search, mode: 'insensitive' } },
+        { model: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -66,6 +92,15 @@ export async function GET(request: Request) {
     const cars = await prisma.car.findMany({
       where,
       orderBy,
+      include: {
+        dealer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json(cars);
@@ -77,6 +112,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Dealer session required to add vehicles.' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const {
       make,
@@ -96,6 +139,7 @@ export async function POST(request: Request) {
       images,
       status,
       isFeatured,
+      dealerId,
     } = body;
 
     if (!make || !model || !year || !price || !mileageKm) {
@@ -103,6 +147,14 @@ export async function POST(request: Request) {
         { error: 'Make, model, year, price, and mileage are required.' },
         { status: 400 }
       );
+    }
+
+    // Role-based dealer assignment
+    // Dealers can ONLY assign to their own dealership
+    // Admins can assign to any specified dealerId or default to themselves
+    let targetDealerId = session.dealerId;
+    if (session.role === 'ADMIN' && dealerId) {
+      targetDealerId = dealerId;
     }
 
     const newCar = await prisma.car.create({
@@ -124,6 +176,16 @@ export async function POST(request: Request) {
         images: typeof images === 'string' ? images : JSON.stringify(images || []),
         status: status || 'AVAILABLE',
         isFeatured: Boolean(isFeatured),
+        dealerId: targetDealerId,
+      },
+      include: {
+        dealer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
       },
     });
 

@@ -31,16 +31,32 @@ import {
   LogOut,
   UploadCloud,
   Star,
-  Loader2
+  Loader2,
+  Building2,
+  UserCheck,
+  UserX,
+  Shield,
+  Check,
+  Tag
 } from 'lucide-react';
 
+interface CurrentUser {
+  dealerId: string;
+  name: string;
+  phone: string;
+  role: 'ADMIN' | 'DEALER';
+}
+
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'leads'>('inventory');
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [activeTab, setActiveTab] = useState<'inventory' | 'leads' | 'dealers'>('inventory');
   const [cars, setCars] = useState<any[]>([]);
   const [inquiries, setInquiries] = useState<any[]>([]);
+  const [dealers, setDealers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [dealerFilter, setDealerFilter] = useState('ALL');
 
   // Modal State for Add/Edit Car
   const [isCarModalOpen, setIsCarModalOpen] = useState(false);
@@ -64,7 +80,18 @@ export default function AdminPage() {
     imagesText: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=1200&q=80',
     status: 'AVAILABLE',
     isFeatured: false,
+    dealerId: '',
   });
+
+  // Modal State for Add Dealer (Admin only)
+  const [isDealerModalOpen, setIsDealerModalOpen] = useState(false);
+  const [dealerFormData, setDealerFormData] = useState({
+    name: '',
+    phone: '',
+    password: '',
+    role: 'DEALER',
+  });
+  const [savingDealer, setSavingDealer] = useState(false);
 
   // Image Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -73,6 +100,11 @@ export default function AdminPage() {
   const [showManualUrl, setShowManualUrl] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
+  const [savingCar, setSavingCar] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  // Process image uploads
   const processFiles = async (files: FileList | File[]) => {
     if (!files || files.length === 0) return;
 
@@ -165,22 +197,44 @@ export default function AdminPage() {
     setManualUrlInput('');
   };
 
-  const [savingCar, setSavingCar] = useState(false);
-  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // Fetch data
-  const loadData = async () => {
+  // Fetch initial portal data & active session
+  const loadData = async (currentDealerFilter = dealerFilter) => {
     try {
       setLoading(true);
-      const [carsRes, inqRes] = await Promise.all([
-        fetch('/api/cars'),
-        fetch('/api/inquiries'),
-      ]);
-      const carsData = await carsRes.json();
-      const inqData = await inqRes.json();
+      const meRes = await fetch('/api/auth/me');
+      if (meRes.status === 401 || meRes.status === 403) {
+        window.location.href = '/admin/login';
+        return;
+      }
 
-      if (Array.isArray(carsData)) setCars(carsData);
-      if (Array.isArray(inqData)) setInquiries(inqData);
+      const meData = await meRes.json();
+      if (meData.authenticated && meData.user) {
+        setCurrentUser(meData.user);
+
+        // Load cars and inquiries scoped to portal
+        const dealerParam = currentDealerFilter !== 'ALL' ? `&dealerId=${currentDealerFilter}` : '';
+        const inqDealerParam = currentDealerFilter !== 'ALL' ? `?dealerId=${currentDealerFilter}` : '';
+
+        const [carsRes, inqRes] = await Promise.all([
+          fetch(`/api/cars?scope=portal${dealerParam}`),
+          fetch(`/api/inquiries${inqDealerParam}`),
+        ]);
+
+        const carsData = await carsRes.json();
+        const inqData = await inqRes.json();
+
+        if (Array.isArray(carsData)) setCars(carsData);
+        if (Array.isArray(inqData)) setInquiries(inqData);
+
+        // If Admin, also load full dealer list
+        if (meData.user.role === 'ADMIN') {
+          const dealersRes = await fetch('/api/admin/dealers');
+          if (dealersRes.ok) {
+            const dealersData = await dealersRes.json();
+            if (Array.isArray(dealersData)) setDealers(dealersData);
+          }
+        }
+      }
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
@@ -195,7 +249,6 @@ export default function AdminPage() {
   // Quick Status Flip for a Car (Available, Reserved, Sold)
   const handleStatusChange = async (carId: string, newStatus: string) => {
     try {
-      // Optimistic update
       setCars((prev) =>
         prev.map((c) => (c.id === carId ? { ...c, status: newStatus } : c))
       );
@@ -215,7 +268,7 @@ export default function AdminPage() {
       setTimeout(() => setActionMessage(null), 3000);
     } catch (err: any) {
       setActionMessage({ type: 'error', text: err.message || 'Error updating status' });
-      loadData(); // Revert
+      loadData();
     }
   };
 
@@ -227,7 +280,10 @@ export default function AdminPage() {
 
     try {
       const res = await fetch(`/api/cars/${carId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete car');
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || 'Failed to delete car');
+      }
 
       setCars((prev) => prev.filter((c) => c.id !== carId));
       setActionMessage({ type: 'success', text: `${carTitle} removed from inventory.` });
@@ -262,6 +318,7 @@ export default function AdminPage() {
       imagesText: imagesArr.join('\n'),
       status: car.status,
       isFeatured: Boolean(car.isFeatured),
+      dealerId: car.dealerId || '',
     });
     setIsCarModalOpen(true);
   };
@@ -288,6 +345,7 @@ export default function AdminPage() {
       imagesText: '',
       status: 'AVAILABLE',
       isFeatured: false,
+      dealerId: currentUser?.dealerId || '',
     });
     setIsCarModalOpen(true);
   };
@@ -307,7 +365,6 @@ export default function AdminPage() {
         .map((s) => s.trim())
         .filter(Boolean);
 
-      // Collect images from images array or fallback to imagesText
       let images = (carFormData.images || []).filter(Boolean);
       if (images.length === 0 && carFormData.imagesText.trim()) {
         images = carFormData.imagesText
@@ -323,6 +380,7 @@ export default function AdminPage() {
         mileageKm: Number(carFormData.mileageKm),
         features,
         images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=1200&q=80'],
+        dealerId: currentUser?.role === 'ADMIN' ? carFormData.dealerId : currentUser?.dealerId,
       };
 
       if (editingCar) {
@@ -332,7 +390,10 @@ export default function AdminPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) throw new Error('Failed to update car');
+        if (!res.ok) {
+          const d = await res.json();
+          throw new Error(d.error || 'Failed to update car');
+        }
         const updated = await res.json();
         setCars((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
         setActionMessage({ type: 'success', text: 'Vehicle updated successfully!' });
@@ -343,10 +404,13 @@ export default function AdminPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) throw new Error('Failed to create car');
+        if (!res.ok) {
+          const d = await res.json();
+          throw new Error(d.error || 'Failed to create car');
+        }
         const created = await res.json();
         setCars((prev) => [created, ...prev]);
-        setActionMessage({ type: 'success', text: 'New vehicle added to inventory!' });
+        setActionMessage({ type: 'success', text: 'New vehicle added to dealership inventory!' });
       }
 
       setIsCarModalOpen(false);
@@ -365,26 +429,32 @@ export default function AdminPage() {
         prev.map((inq) => (inq.id === inqId ? { ...inq, status: newStatus } : inq))
       );
 
-      await fetch(`/api/inquiries/${inqId}`, {
+      const res = await fetch(`/api/inquiries/${inqId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
-    } catch (err) {
-      console.error('Failed to update inquiry status:', err);
+
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || 'Failed to update status');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to update inquiry status');
+      loadData();
     }
   };
 
-  // Re-seed Database
+  // Re-seed Database (Admin only)
   const handleReseed = async () => {
-    if (!window.confirm('Reset and re-seed the database with default showcase inventory?')) {
+    if (!window.confirm('Reset and re-seed the database with 1 Admin, 6 Dealers, showcase inventory, and test leads?')) {
       return;
     }
     try {
       setLoading(true);
       const res = await fetch('/api/seed', { method: 'POST' });
       const data = await res.json();
-      alert(data.message || 'Database re-seeded!');
+      alert(data.message || 'Database re-seeded successfully!');
       loadData();
     } catch (err) {
       alert('Failed to re-seed database');
@@ -393,15 +463,14 @@ export default function AdminPage() {
     }
   };
 
-  // Admin Logout Handler
-  const [loggingOut, setLoggingOut] = useState(false);
+  // Logout Handler
   const handleLogout = async () => {
     if (!window.confirm('Are you sure you want to log out of the Dealer Portal?')) {
       return;
     }
     try {
       setLoggingOut(true);
-      await fetch('/api/admin/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { method: 'POST' });
       window.location.href = '/admin/login';
     } catch (err) {
       console.error('Logout failed:', err);
@@ -409,12 +478,80 @@ export default function AdminPage() {
     }
   };
 
-  // Computed Stats
-  const totalCount = cars.length;
-  const availableCount = cars.filter((c) => c.status === 'AVAILABLE').length;
-  const reservedCount = cars.filter((c) => c.status === 'RESERVED').length;
-  const soldCount = cars.filter((c) => c.status === 'SOLD').length;
-  const newLeadsCount = inquiries.filter((i) => i.status === 'NEW').length;
+  // Toggle Dealer Active State (Admin only)
+  const handleToggleDealerActive = async (dealer: any) => {
+    const newStatus = !dealer.isActive;
+    const confirmMsg = newStatus 
+      ? `Re-activate access for ${dealer.name}?` 
+      : `Deactivate ${dealer.name}? They will immediately lose access to the portal.`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch(`/api/admin/dealers/${dealer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: newStatus }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update dealer status');
+
+      setDealers((prev) =>
+        prev.map((d) => (d.id === dealer.id ? { ...d, isActive: newStatus } : d))
+      );
+      setActionMessage({
+        type: 'success',
+        text: `${dealer.name} ${newStatus ? 'activated' : 'deactivated'} successfully!`,
+      });
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Error updating dealer status');
+    }
+  };
+
+  // Add New Dealer (Admin only)
+  const handleCreateDealer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dealerFormData.name || !dealerFormData.phone || !dealerFormData.password) {
+      alert('Please fill in all fields.');
+      return;
+    }
+
+    const cleanPhone = dealerFormData.phone.replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length !== 10) {
+      alert('Mobile number must be exactly 10 digits.');
+      return;
+    }
+
+    setSavingDealer(true);
+    try {
+      const res = await fetch('/api/admin/dealers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...dealerFormData,
+          phone: cleanPhone,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create dealer');
+
+      setDealers((prev) => [...prev, data]);
+      setIsDealerModalOpen(false);
+      setDealerFormData({ name: '', phone: '', password: '', role: 'DEALER' });
+      setActionMessage({
+        type: 'success',
+        text: `New dealer ${data.name} added to Brothers Autos network!`,
+      });
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to create dealer');
+    } finally {
+      setSavingDealer(false);
+    }
+  };
 
   // Filtered Cars in Admin Table
   const displayCars = cars.filter((car) => {
@@ -423,51 +560,80 @@ export default function AdminPage() {
       const q = searchQuery.toLowerCase();
       const matchMake = car.make.toLowerCase().includes(q);
       const matchModel = car.model.toLowerCase().includes(q);
-      return matchMake || matchModel;
+      const matchDealer = car.dealer?.name?.toLowerCase().includes(q);
+      return matchMake || matchModel || matchDealer;
     }
     return true;
   });
 
+  // Computed Stats
+  const totalCount = cars.length;
+  const availableCount = cars.filter((c) => c.status === 'AVAILABLE').length;
+  const reservedCount = cars.filter((c) => c.status === 'RESERVED').length;
+  const soldCount = cars.filter((c) => c.status === 'SOLD').length;
+  const newLeadsCount = inquiries.filter((i) => i.status === 'NEW').length;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
       
-      {/* Top Header */}
+      {/* Top Header with Dealer Context & User Info */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold uppercase tracking-wider">
-              Dealer Control Center
+            <span className={`px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider border ${
+              currentUser?.role === 'ADMIN'
+                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                : 'bg-blue-100 text-blue-900 border-blue-300'
+            }`}>
+              {currentUser?.role === 'ADMIN' ? 'Super Admin Portal' : 'Dealer Portal'}
             </span>
-            <span className="text-xs text-slate-400 font-medium">Brothers Autos Admin</span>
+            <span className="text-xs text-slate-400 font-medium">Brothers Autos Network</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
-            Showroom Fleet & Lead Management
+
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1 flex items-center gap-2">
+            <span>{currentUser?.name || 'Showroom Management'}</span>
           </h1>
+
+          <div className="flex items-center gap-3 text-xs text-slate-500 font-medium mt-1">
+            <span className="flex items-center gap-1">
+              <Phone className="w-3.5 h-3.5 text-slate-400" />
+              +91 {currentUser?.phone || ''}
+            </span>
+            <span>&bull;</span>
+            <span className="text-slate-600 font-semibold">
+              {currentUser?.role === 'ADMIN' 
+                ? 'Cross-Dealer Management & Full Authority' 
+                : 'Dealership Scoped Access'}
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleReseed}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-xs"
-            title="Reset to 8 default showcase cars"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-            <span>Reset Demo DB</span>
-          </button>
+        {/* Header Action Buttons */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {currentUser?.role === 'ADMIN' && (
+            <button
+              onClick={handleReseed}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
+              title="Reset DB with default 6 dealers & showcase vehicles"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+              <span>Reset Demo DB</span>
+            </button>
+          )}
 
           <button
             onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-500 hover:to-brand-600 shadow-md transition-all active:scale-95"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-500 hover:to-brand-600 shadow-md transition-all active:scale-95 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Add New Vehicle</span>
+            <span>Add Vehicle</span>
           </button>
 
           <button
             onClick={handleLogout}
             disabled={loggingOut}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors shadow-xs active:scale-95 disabled:opacity-50"
-            title="Log out and lock dealer dashboard"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors shadow-xs active:scale-95 disabled:opacity-50 cursor-pointer"
+            title="Sign out of portal"
           >
             <LogOut className="w-3.5 h-3.5 text-rose-600" />
             <span>{loggingOut ? 'Signing out...' : 'Logout'}</span>
@@ -485,7 +651,7 @@ export default function AdminPage() {
           }`}
         >
           <span>{actionMessage.text}</span>
-          <button onClick={() => setActionMessage(null)} className="text-slate-400 hover:text-slate-600">
+          <button onClick={() => setActionMessage(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -494,9 +660,11 @@ export default function AdminPage() {
       {/* Key Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Fleet</span>
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+            {currentUser?.role === 'ADMIN' ? 'Total Fleet' : 'Your Fleet'}
+          </span>
           <div className="text-2xl font-black text-slate-900 mt-1">{totalCount}</div>
-          <span className="text-[11px] text-slate-400 font-medium">Cars listed in DB</span>
+          <span className="text-[11px] text-slate-400 font-medium">Cars in inventory</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200 shadow-xs">
@@ -524,36 +692,54 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Tabs: Fleet Inventory vs Customer Leads */}
-      <div className="flex items-center space-x-2 border-b border-slate-200">
+      {/* Navigation Tabs */}
+      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto">
         <button
           onClick={() => setActiveTab('inventory')}
-          className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+          className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === 'inventory'
               ? 'border-brand-600 text-brand-600'
               : 'border-transparent text-slate-500 hover:text-slate-900'
           }`}
         >
           <Car className="w-4 h-4" />
-          <span>Vehicle Inventory Table ({cars.length})</span>
+          <span>Vehicle Inventory ({cars.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('leads')}
-          className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+          className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === 'leads'
               ? 'border-brand-600 text-brand-600'
               : 'border-transparent text-slate-500 hover:text-slate-900'
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>Customer Leads & Inquiries ({inquiries.length})</span>
+          <span>Customer Leads ({inquiries.length})</span>
           {newLeadsCount > 0 && (
             <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black">
               {newLeadsCount}
             </span>
           )}
         </button>
+
+        {/* Tab 3: Dealer Network Management (Admin only) */}
+        {currentUser?.role === 'ADMIN' && (
+          <button
+            onClick={() => setActiveTab('dealers')}
+            className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeTab === 'dealers'
+                ? 'border-amber-500 text-amber-600'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Building2 className="w-4 h-4 text-amber-500" />
+            <span>Dealer Network ({dealers.length})</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black border border-amber-300">
+              Admin Only
+            </span>
+          </button>
+        )}
       </div>
 
       {/* TAB 1: FLEET INVENTORY MANAGEMENT */}
@@ -567,23 +753,48 @@ export default function AdminPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search inventory by make or model..."
+                placeholder="Search inventory by make, model, or dealer..."
                 className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-500">Filter Status:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white cursor-pointer focus:outline-none focus:border-brand-500"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="AVAILABLE">Available</option>
-                <option value="RESERVED">Reserved</option>
-                <option value="SOLD">Sold</option>
-              </select>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Dealer Filter (Admin Only) */}
+              {currentUser?.role === 'ADMIN' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-500">Dealership:</span>
+                  <select
+                    value={dealerFilter}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDealerFilter(val);
+                      loadData(val);
+                    }}
+                    className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white cursor-pointer focus:outline-none focus:border-brand-500"
+                  >
+                    <option value="ALL">All Dealerships ({dealers.length})</option>
+                    {dealers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d._count?.cars || 0} cars)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500">Status:</span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white cursor-pointer focus:outline-none focus:border-brand-500"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="AVAILABLE">Available</option>
+                  <option value="RESERVED">Reserved</option>
+                  <option value="SOLD">Sold</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -594,6 +805,9 @@ export default function AdminPage() {
                 <thead className="bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                   <tr>
                     <th className="py-3.5 px-4">Vehicle</th>
+                    {currentUser?.role === 'ADMIN' && (
+                      <th className="py-3.5 px-3">Dealership</th>
+                    )}
                     <th className="py-3.5 px-3">Price</th>
                     <th className="py-3.5 px-3">Specs</th>
                     <th className="py-3.5 px-3">Status (1-Click Flip)</th>
@@ -626,6 +840,20 @@ export default function AdminPage() {
                             </div>
                           </div>
                         </td>
+
+                        {/* Dealership (Admin view) */}
+                        {currentUser?.role === 'ADMIN' && (
+                          <td className="py-3 px-3">
+                            <span className="font-bold text-slate-800 block text-xs">
+                              {car.dealer?.name || 'Unassigned'}
+                            </span>
+                            {car.dealer?.phone && (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                +91 {car.dealer.phone}
+                              </span>
+                            )}
+                          </td>
+                        )}
 
                         {/* Price */}
                         <td className="py-3 px-3 font-bold text-slate-900">
@@ -688,7 +916,7 @@ export default function AdminPage() {
 
                             <button
                               onClick={() => handleOpenEdit(car)}
-                              className="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                               title="Edit Vehicle"
                             >
                               <Edit3 className="w-4 h-4" />
@@ -696,7 +924,7 @@ export default function AdminPage() {
 
                             <button
                               onClick={() => handleDeleteCar(car.id, `${car.make} ${car.model}`)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                               title="Delete Vehicle"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -730,7 +958,10 @@ export default function AdminPage() {
                     <th className="py-3.5 px-4">Lead Type</th>
                     <th className="py-3.5 px-4">Customer Name & Contact</th>
                     <th className="py-3.5 px-3">Vehicle Interested</th>
-                    <th className="py-3.5 px-3">Date & Preference</th>
+                    {currentUser?.role === 'ADMIN' && (
+                      <th className="py-3.5 px-3">Assigned Dealer</th>
+                    )}
+                    <th className="py-3.5 px-3">Date & Window</th>
                     <th className="py-3.5 px-3">Lead Status</th>
                     <th className="py-3.5 px-4 text-right">Instant Contact</th>
                   </tr>
@@ -775,6 +1006,15 @@ export default function AdminPage() {
                             </div>
                           )}
                         </td>
+
+                        {/* Assigned Dealer (Admin view) */}
+                        {currentUser?.role === 'ADMIN' && (
+                          <td className="py-3.5 px-3">
+                            <span className="font-bold text-slate-800 block text-xs">
+                              {inq.dealer?.name || inq.car?.dealer?.name || 'Central Showroom'}
+                            </span>
+                          </td>
+                        )}
 
                         {/* Preferred Date & Window */}
                         <td className="py-3.5 px-3">
@@ -835,9 +1075,127 @@ export default function AdminPage() {
 
             {inquiries.length === 0 && (
               <div className="p-8 text-center text-slate-500 text-xs">
-                No customer inquiries yet.
+                No customer inquiries yet for this dealership.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: DEALER NETWORK MANAGEMENT (Admin Only) */}
+      {activeTab === 'dealers' && currentUser?.role === 'ADMIN' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Registered Dealership Accounts</h2>
+              <p className="text-xs text-slate-500">
+                Manage all {dealers.length} dealerships, add new dealer credentials, and toggle account access.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsDealerModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add New Dealer</span>
+            </button>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-700">
+                <thead className="bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="py-3.5 px-4">Dealership Name</th>
+                    <th className="py-3.5 px-4">Registered Phone</th>
+                    <th className="py-3.5 px-3">Role</th>
+                    <th className="py-3.5 px-3 text-center">Vehicles Listed</th>
+                    <th className="py-3.5 px-3 text-center">Active Leads</th>
+                    <th className="py-3.5 px-3 text-center">Access Status</th>
+                    <th className="py-3.5 px-4 text-right">Access Controls</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {dealers.map((dealer) => {
+                    const isSelf = dealer.id === currentUser.dealerId;
+                    return (
+                      <tr key={dealer.id} className="hover:bg-slate-50/80 transition-colors">
+                        {/* Name */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-slate-400" />
+                            <span>{dealer.name}</span>
+                            {isSelf && (
+                              <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-black">
+                                Current You
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Phone */}
+                        <td className="py-3.5 px-4 font-mono text-slate-600">
+                          +91 {dealer.phone}
+                        </td>
+
+                        {/* Role */}
+                        <td className="py-3.5 px-3">
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                            dealer.role === 'ADMIN'
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : 'bg-blue-50 text-blue-800 border border-blue-200'
+                          }`}>
+                            {dealer.role}
+                          </span>
+                        </td>
+
+                        {/* Cars count */}
+                        <td className="py-3.5 px-3 text-center font-bold text-slate-800">
+                          {dealer._count?.cars || 0}
+                        </td>
+
+                        {/* Leads count */}
+                        <td className="py-3.5 px-3 text-center font-bold text-brand-600">
+                          {dealer._count?.leads || 0}
+                        </td>
+
+                        {/* Active Status */}
+                        <td className="py-3.5 px-3 text-center">
+                          {dealer.isActive ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                              <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
+                              <UserX className="w-3.5 h-3.5 text-rose-600" />
+                              Deactivated
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Toggle Active Button */}
+                        <td className="py-3.5 px-4 text-right">
+                          {!isSelf && (
+                            <button
+                              onClick={() => handleToggleDealerActive(dealer)}
+                              className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
+                                dealer.isActive
+                                  ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                              }`}
+                            >
+                              {dealer.isActive ? 'Deactivate Access' : 'Reactivate Access'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -851,7 +1209,7 @@ export default function AdminPage() {
             <div className="bg-slate-900 text-white p-6 flex items-center justify-between">
               <div>
                 <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                  Showroom Fleet Management
+                  {currentUser?.role === 'ADMIN' ? 'Fleet Management' : `${currentUser?.name}`}
                 </span>
                 <h3 className="text-xl font-bold text-white mt-0.5">
                   {editingCar ? `Edit ${editingCar.year} ${editingCar.make} ${editingCar.model}` : 'Add New Vehicle to Inventory'}
@@ -859,7 +1217,7 @@ export default function AdminPage() {
               </div>
               <button
                 onClick={() => setIsCarModalOpen(false)}
-                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -868,6 +1226,27 @@ export default function AdminPage() {
             {/* Modal Form Body */}
             <form onSubmit={handleSaveCar} className="p-6 overflow-y-auto space-y-4 text-xs">
               
+              {/* Dealership Assignment (Admin Only) */}
+              {currentUser?.role === 'ADMIN' && (
+                <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200">
+                  <label className="block font-bold text-amber-900 mb-1">
+                    Assign to Dealership
+                  </label>
+                  <select
+                    value={carFormData.dealerId}
+                    onChange={(e) => setCarFormData({ ...carFormData, dealerId: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-amber-300 bg-white font-bold text-slate-800"
+                  >
+                    <option value="">Default (Super Admin / Central Showroom)</option>
+                    {dealers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.phone})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Row 1: Make, Model, Year */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
@@ -1032,7 +1411,7 @@ export default function AdminPage() {
                     id="isFeatured"
                     checked={carFormData.isFeatured}
                     onChange={(e) => setCarFormData({ ...carFormData, isFeatured: e.target.checked })}
-                    className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500"
+                    className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer"
                   />
                   <label htmlFor="isFeatured" className="font-bold text-slate-800 cursor-pointer">
                     Show in Homepage "Featured Cars"
@@ -1082,7 +1461,7 @@ export default function AdminPage() {
                   </span>
                 </div>
 
-                {/* Dropzone / Upload Area */}
+                {/* Dropzone */}
                 <div
                   onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
                   onDragLeave={() => setIsDragOver(false)}
@@ -1151,7 +1530,6 @@ export default function AdminPage() {
                               className="w-full h-full object-cover"
                             />
                             
-                            {/* Badges & Actions Overlay */}
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
                               <div className="flex justify-between items-start">
                                 {isCover ? (
@@ -1184,7 +1562,6 @@ export default function AdminPage() {
                               </span>
                             </div>
 
-                            {/* Persistent Cover Ribbon if not hovered */}
                             {isCover && (
                               <div className="absolute bottom-1.5 left-1.5 pointer-events-none group-hover:hidden">
                                 <span className="inline-flex items-center gap-1 bg-amber-500/95 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow-sm">
@@ -1235,20 +1612,127 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setIsCarModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingCar}
-                  className="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md disabled:opacity-50"
+                  className="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md disabled:opacity-50 cursor-pointer"
                 >
                   {savingCar ? 'Saving...' : editingCar ? 'Save Changes' : 'Create Car Listing'}
                 </button>
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ADD DEALER MODAL (Admin Only) */}
+      {isDealerModalOpen && currentUser?.role === 'ADMIN' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
+            
+            <div className="bg-slate-900 text-white p-6 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                  Network Expansion
+                </span>
+                <h3 className="text-xl font-bold text-white mt-0.5">
+                  Register New Dealership
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsDealerModalOpen(false)}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDealer} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Dealership / Showroom Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={dealerFormData.name}
+                  onChange={(e) => setDealerFormData({ ...dealerFormData, name: e.target.value })}
+                  placeholder="e.g. Skyline Motors (Kandivali)"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Primary Mobile Number (Login ID) *
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 font-bold text-xs">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    value={dealerFormData.phone}
+                    onChange={(e) => setDealerFormData({ ...dealerFormData, phone: e.target.value.replace(/\D/g, '') })}
+                    placeholder="10-digit mobile number"
+                    className="w-full pl-12 pr-3 py-2.5 rounded-xl border border-slate-200 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Account Password *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={dealerFormData.password}
+                  onChange={(e) => setDealerFormData({ ...dealerFormData, password: e.target.value })}
+                  placeholder="Temporary password (e.g. Dealer@123)"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Portal Role
+                </label>
+                <select
+                  value={dealerFormData.role}
+                  onChange={(e) => setDealerFormData({ ...dealerFormData, role: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-800"
+                >
+                  <option value="DEALER">DEALER (Scoped to own inventory & leads)</option>
+                  <option value="ADMIN">ADMIN (Full network management authority)</option>
+                </select>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsDealerModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingDealer}
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-md disabled:opacity-50 cursor-pointer"
+                >
+                  {savingDealer ? 'Registering...' : 'Register Dealer'}
+                </button>
+              </div>
+            </form>
+
           </div>
         </div>
       )}

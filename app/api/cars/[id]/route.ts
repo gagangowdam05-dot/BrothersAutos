@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,13 @@ export async function GET(
     const car = await prisma.car.findUnique({
       where: { id },
       include: {
+        dealer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
         inquiries: {
           orderBy: { createdAt: 'desc' },
           take: 5,
@@ -35,7 +43,33 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Session required to modify vehicle.' },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
+
+    const existingCar = await prisma.car.findUnique({
+      where: { id },
+      select: { id: true, dealerId: true },
+    });
+
+    if (!existingCar) {
+      return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 });
+    }
+
+    // RBAC: Check dealer ownership
+    if (session.role === 'DEALER' && existingCar.dealerId !== session.dealerId) {
+      return NextResponse.json(
+        { error: 'Forbidden. You do not have permission to modify another dealer’s vehicle.' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const {
       make,
@@ -55,6 +89,7 @@ export async function PUT(
       images,
       status,
       isFeatured,
+      dealerId,
     } = body;
 
     const updateData: any = {};
@@ -74,6 +109,11 @@ export async function PUT(
     if (status !== undefined) updateData.status = status;
     if (isFeatured !== undefined) updateData.isFeatured = Boolean(isFeatured);
 
+    // Only Admin can reassign a vehicle to another dealer
+    if (session.role === 'ADMIN' && dealerId !== undefined) {
+      updateData.dealerId = dealerId || null;
+    }
+
     if (features !== undefined) {
       updateData.features = typeof features === 'string' ? features : JSON.stringify(features);
     }
@@ -84,6 +124,15 @@ export async function PUT(
     const updatedCar = await prisma.car.update({
       where: { id },
       data: updateData,
+      include: {
+        dealer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json(updatedCar);
@@ -98,12 +147,38 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Session required to delete vehicle.' },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
+
+    const existingCar = await prisma.car.findUnique({
+      where: { id },
+      select: { id: true, dealerId: true },
+    });
+
+    if (!existingCar) {
+      return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 });
+    }
+
+    // RBAC: Check dealer ownership
+    if (session.role === 'DEALER' && existingCar.dealerId !== session.dealerId) {
+      return NextResponse.json(
+        { error: 'Forbidden. You do not have permission to delete another dealer’s vehicle.' },
+        { status: 403 }
+      );
+    }
+
     await prisma.car.delete({
       where: { id },
     });
 
-    return NextResponse.json({ success: true, message: 'Car deleted successfully' });
+    return NextResponse.json({ success: true, message: 'Vehicle deleted successfully' });
   } catch (error) {
     console.error('Failed to delete car:', error);
     return NextResponse.json({ error: 'Failed to delete car' }, { status: 500 });

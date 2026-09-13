@@ -1,13 +1,50 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Session required to view leads.' },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const dealerIdFilter = searchParams.get('dealerId');
+
+    const where: any = {};
+
+    if (session.role === 'DEALER') {
+      // Scoped strictly to inquiries assigned to this dealer directly or via their vehicle
+      where.OR = [
+        { dealerId: session.dealerId },
+        { car: { dealerId: session.dealerId } },
+      ];
+    } else if (session.role === 'ADMIN') {
+      if (dealerIdFilter && dealerIdFilter !== 'ALL') {
+        where.OR = [
+          { dealerId: dealerIdFilter },
+          { car: { dealerId: dealerIdFilter } },
+        ];
+      }
+    }
+
     const inquiries = await prisma.inquiry.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
+        dealer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
         car: {
           select: {
             id: true,
@@ -16,6 +53,14 @@ export async function GET() {
             year: true,
             price: true,
             images: true,
+            dealerId: true,
+            dealer: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
           },
         },
       },
@@ -51,21 +96,24 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if car exists if carId is provided
     let title = carTitle;
-    if (carId && !title) {
+    let targetDealerId: string | null = null;
+
+    if (carId) {
       const car = await prisma.car.findUnique({
         where: { id: carId },
-        select: { year: true, make: true, model: true },
+        select: { year: true, make: true, model: true, dealerId: true },
       });
       if (car) {
         title = `${car.year} ${car.make} ${car.model}`;
+        targetDealerId = car.dealerId;
       }
     }
 
     const inquiry = await prisma.inquiry.create({
       data: {
         carId: carId || null,
+        dealerId: targetDealerId,
         carTitle: title || 'General Showroom Inquiry',
         customerName: String(customerName).trim(),
         phone: String(phone).trim(),
@@ -76,6 +124,15 @@ export async function POST(request: Request) {
         tokenAmount: tokenAmount ? Number(tokenAmount) : null,
         message: message ? String(message).trim() : null,
         status: 'NEW',
+      },
+      include: {
+        dealer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
       },
     });
 
